@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>备忘录</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .container {
+            display: grid;
+            grid-template-areas: 
+                "title title title"
+                "sidebar main aside"
+                "sidebar main aside"
+                "sidebar footer aside";
+            grid-template-columns: 1fr 3fr 1fr;
+            gap: 20px;
+            max-width: 1920px;
+            width: 90%;
+            height: 90%;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .title {
+            grid-area: title;
+            text-align: center;
+            font-size: 3em;
+            font-weight: bold;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #ccc;
+        }
+        .sidebar, .main, .aside {
+            padding: 20px;
+        }
+        .sidebar {
+            grid-area: sidebar;
+            border-right: 1px solid #ccc;
+        }
+        .main {
+            grid-area: main;
+            display: flex;
+            flex-direction: column;
+        }
+        .aside {
+            grid-area: aside;
+            border-left: 1px solid #ccc;
+        }
+        .footer {
+            grid-area: footer;
+        }
+        textarea {
+            width: 100%;
+            height: 150px;
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            resize: none;
+            font-size: 1.5em;
+        }
+        button {
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 10px;
+            transition: background-color 0.3s;
+            font-size: 1em;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .note, .message {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            position: relative;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.0em;
+        }
+        .icon-btn {
+            cursor: pointer;
+            color: #666;
+            margin-left: 10px;
+            transition: color 0.3s;
+            font-size: 1.0em;
+        }
+        .icon-btn:hover {
+            color: #000;
+        }
+        .completed {
+            color: grey;
+            text-decoration: line-through;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            width: 50%;
+            text-align: left;
+        }
+        .modal-header, .modal-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .close {
+            color: #aaa;
+            cursor: pointer;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close:hover,
+        .close:focus {
+            color: black;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="title">备忘录</div>
+        <div class="sidebar">
+            <h3>每一天的备忘录</h3>
+            <div id="dailyNotes"></div>
+        </div>
+        <div class="main">
+            <h3>备忘录（今日）</h3>
+            <div id="notes"></div>
+            <textarea id="noteInput" placeholder="输入你的备忘录..."></textarea>
+            <div style="margin-top: auto;">
+                <button onclick="addNote()">添加备忘录</button>
+                <button onclick="saveDailyNotes()">留存备忘录</button>
+            </div>
+        </div>
+        <div class="aside">
+            <h3>留言区</h3>
+            <div id="messages"></div>
+            <textarea id="messageInput" placeholder="输入你的留言..."></textarea>
+            <button onclick="addMessage()">发送留言</button>
+        </div>
+        <div class="footer"></div>
+    </div>
+
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle"></h2>
+                <span class="close" onclick="closeModal()">&times;</span>
+            </div>
+            <div id="modalBody"></div>
+            <div class="modal-footer">
+                <button onclick="closeModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', loadContent);
+
+        function addNote() {
+            const noteInput = document.getElementById('noteInput');
+            const noteText = noteInput.value.trim();
+
+            if (noteText === '') {
+                alert('请输入备忘录内容');
+                return;
+            }
+
+            const notes = getNotesFromStorage('notes');
+            notes.push({ text: noteText, completed: false });
+            localStorage.setItem('notes', JSON.stringify(notes));
+
+            displayNotes();
+            noteInput.value = '';
+        }
+
+        function addMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const messageText = messageInput.value.trim();
+
+            if (messageText === '') {
+                alert('请输入留言内容');
+                return;
+            }
+
+            const messages = getNotesFromStorage('messages');
+            messages.push({ text: messageText, completed: false });
+            localStorage.setItem('messages', JSON.stringify(messages));
+
+            displayMessages();
+            messageInput.value = '';
+        }
+
+        function deleteItem(index, type) {
+            const items = getNotesFromStorage(type);
+            items.splice(index, 1);
+            localStorage.setItem(type, JSON.stringify(items));
+
+            type === 'notes' ? displayNotes() : displayMessages();
+        }
+
+        function completeItem(index, type) {
+            const items = getNotesFromStorage(type);
+            items[index].completed = !items[index].completed;
+            localStorage.setItem(type, JSON.stringify(items));
+
+            type === 'notes' ? displayNotes() : displayMessages();
+        }
+
+        function getNotesFromStorage(key) {
+            const items = localStorage.getItem(key);
+            return items ? JSON.parse(items) : [];
+        }
+
+        function displayNotes() {
+            const notesContainer = document.getElementById('notes');
+            notesContainer.innerHTML = '';
+
+            const notes = getNotesFromStorage('notes');
+            notes.forEach((note, index) => {
+                const noteElement = document.createElement('div');
+                noteElement.className = `note${note.completed ? ' completed' : ''}`;
+                
+                const noteText = document.createElement('span');
+                noteText.innerText = note.text;
+                
+                const buttonsContainer = document.createElement('div');
+                
+                const completeBtn = document.createElement('i');
+                completeBtn.className = 'fas fa-check icon-btn';
+                completeBtn.onclick = () => completeItem(index, 'notes');
+                
+                const deleteBtn = document.createElement('i');
+                deleteBtn.className = 'fas fa-trash icon-btn';
+                deleteBtn.onclick = () => deleteItem(index, 'notes');
+                
+                buttonsContainer.appendChild(completeBtn);
+                buttonsContainer.appendChild(deleteBtn);
+                
+                noteElement.appendChild(noteText);
+                noteElement.appendChild(buttonsContainer);
+                notesContainer.appendChild(noteElement);
+            });
+        }
+
+        function displayMessages() {
+            const messagesContainer = document.getElementById('messages');
+            messagesContainer.innerHTML = '';
+
+            const messages = getNotesFromStorage('messages');
+            messages.forEach((message, index) => {
+                const messageElement = document.createElement('div');
+                messageElement.className = `message${message.completed ? ' completed' : ''}`;
+                
+                const messageText = document.createElement('span');
+                messageText.innerText = message.text;
+                
+                const buttonsContainer = document.createElement('div');
+                
+                const completeBtn = document.createElement('i');
+                completeBtn.className = 'fas fa-check icon-btn';
+                completeBtn.onclick = () => completeItem(index, 'messages');
+                
+                const deleteBtn = document.createElement('i');
+                deleteBtn.className = 'fas fa-trash icon-btn';
+                deleteBtn.onclick = () => deleteItem(index, 'messages');
+                
+                buttonsContainer.appendChild(completeBtn);
+                buttonsContainer.appendChild(deleteBtn);
+                
+                messageElement.appendChild(messageText);
+                messageElement.appendChild(buttonsContainer);
+                messagesContainer.appendChild(messageElement);
+            });
+        }
+
+        function saveDailyNotes() {
+            const notes = getNotesFromStorage('notes');
+            const today = new Date().toLocaleDateString();
+
+            const dailyNotes = getNotesFromStorage('dailyNotes');
+            dailyNotes.push({ date: today, notes });
+            localStorage.setItem('dailyNotes', JSON.stringify(dailyNotes));
+
+            localStorage.removeItem('notes');
+            displayNotes();
+            displayDailyNotes();
+        }
+
+        function deleteDailyNoteItem(index) {
+            const dailyNotes = getNotesFromStorage('dailyNotes');
+            dailyNotes.splice(index, 1);
+            localStorage.setItem('dailyNotes', JSON.stringify(dailyNotes));
+
+            displayDailyNotes();
+        }
+
+        function viewDailyNotes(index) {
+            const dailyNotes = getNotesFromStorage('dailyNotes');
+            const dailyNote = dailyNotes[index];
+
+            const modal = document.getElementById('modal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalBody = document.getElementById('modalBody');
+
+            modalTitle.innerText = `备忘录：${dailyNote.date}`;
+            modalBody.innerHTML = '';
+
+            dailyNote.notes.forEach((note, index) => {
+                const noteElement = document.createElement('div');
+                noteElement.className = `note${note.completed ? ' completed' : ''}`;
+                
+                const noteText = document.createElement('span');
+                noteText.innerText = note.text;
+                
+                const buttonsContainer = document.createElement('div');
+                
+                const completeBtn = document.createElement('i');
+                completeBtn.className = 'fas fa-check icon-btn';
+                completeBtn.onclick = () => {
+                    completeItem(index, 'notes');
+                    viewDailyNotes(index);
+                };
+                
+                const deleteBtn = document.createElement('i');
+                deleteBtn.className = 'fas fa-trash icon-btn';
+                deleteBtn.onclick = () => {
+                    deleteItem(index, 'notes');
+                    viewDailyNotes(index);
+                };
+                
+                buttonsContainer.appendChild(completeBtn);
+                buttonsContainer.appendChild(deleteBtn);
+                
+                noteElement.appendChild(noteText);
+                noteElement.appendChild(buttonsContainer);
+                modalBody.appendChild(noteElement);
+            });
+
+            modal.style.display = 'flex';
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('modal');
+            modal.style.display = 'none';
+        }
+
+        function displayDailyNotes() {
+            const dailyNotesContainer = document.getElementById('dailyNotes');
+            dailyNotesContainer.innerHTML = '';
+
+            const dailyNotes = getNotesFromStorage('dailyNotes');
+            dailyNotes.forEach((dailyNote, index) => {
+                const dateElement = document.createElement('div');
+                dateElement.className = 'note';
+                dateElement.innerHTML = `<span>${dailyNote.date}</span>`;
+                dateElement.onclick = () => viewDailyNotes(index);
+                
+                const deleteBtn = document.createElement('i');
+                deleteBtn.className = 'fas fa-trash icon-btn';
+                deleteBtn.onclick = (event) => {
+                    event.stopPropagation();
+                    deleteDailyNoteItem(index);
+                };
+
+                dateElement.appendChild(deleteBtn);
+                dailyNotesContainer.appendChild(dateElement);
+            });
+        }
+
+        function loadContent() {
+            displayNotes();
+            displayMessages();
+            displayDailyNotes();
+        }
+    </script>
+</body>
+</html>
